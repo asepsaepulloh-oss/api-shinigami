@@ -25,7 +25,8 @@ app.use((req: Request, _res: Response, next: NextFunction) => {
 app.use("/api", routes);
 
 // Serve frontend static files
-const publicDir = path.join(__dirname, "..", "public");
+// process.cwd() points to project root on both local and Vercel
+const publicDir = path.join(process.cwd(), "public");
 app.use(express.static(publicDir));
 
 // SPA fallback — serve index.html for any non-API route
