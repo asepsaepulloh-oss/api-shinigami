@@ -30,6 +30,22 @@ router.get("/latest", mangaController.getLatestUpdates);
 router.get("/search", mangaController.searchManga);
 
 /**
+ * @route   GET /api/manga/image
+ * @desc    Download manga image with proper headers
+ * @query   url - Image URL (required)
+ * @access  Public
+ */
+router.get("/image", mangaController.downloadImage);
+
+/**
+ * @route   GET /api/manga/chapter/:chapterId/pages
+ * @desc    Get page list for a chapter
+ * @param   chapterId - Chapter ID
+ * @access  Public
+ */
+router.get("/chapter/:chapterId/pages", mangaController.getPageList);
+
+/**
  * @route   GET /api/manga/:mangaId
  * @desc    Get manga details
  * @param   mangaId - Manga ID
@@ -44,21 +60,5 @@ router.get("/:mangaId", mangaController.getMangaDetails);
  * @access  Public
  */
 router.get("/:mangaId/chapters", mangaController.getChapterList);
-
-/**
- * @route   GET /api/manga/chapter/:chapterId/pages
- * @desc    Get page list for a chapter
- * @param   chapterId - Chapter ID
- * @access  Public
- */
-router.get("/chapter/:chapterId/pages", mangaController.getPageList);
-
-/**
- * @route   GET /api/manga/image
- * @desc    Download manga image with proper headers
- * @query   url - Image URL (required)
- * @access  Public
- */
-router.get("/image", mangaController.downloadImage);
 
 export default router;

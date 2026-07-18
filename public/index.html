@@ -1,0 +1,427 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Shinigami REST API — Documentation</title>
+  <meta name="description" content="Shinigami Manga REST API documentation. All endpoints, parameters, and response schemas." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" media="print" onload="this.media='all'" />
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" /></noscript>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- ACCESS GATE -->
+  <div class="gate" id="gate">
+    <div class="gate-card">
+      <div class="gate-icon">&#x26E9;</div>
+      <div class="gate-title">Shinigami API</div>
+      <div class="gate-sub">Enter access code to continue</div>
+      <form class="gate-form" id="gate-form" autocomplete="off">
+        <input class="gate-input" id="gate-input" type="password" placeholder="Access code" maxlength="64" autofocus />
+        <div class="gate-error hidden" id="gate-error">Incorrect code. Try again.</div>
+        <button class="gate-btn" type="submit">Unlock</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <span class="brand-icon">&#x26E9;</span>
+      <div>
+        <div class="brand-name">Shinigami API</div>
+        <div class="brand-ver">v1.0.0 &mdash; REST</div>
+      </div>
+    </div>
+
+    <div class="sidebar-section">Base URL</div>
+    <div class="sidebar-base-url" id="base-url-display">http://localhost:3000</div>
+
+    <div class="sidebar-section">Endpoints</div>
+    <nav class="sidebar-nav" id="sidebar-nav">
+      <a class="sidebar-link" href="#ep-popular">GET /manga/popular</a>
+      <a class="sidebar-link" href="#ep-latest">GET /manga/latest</a>
+      <a class="sidebar-link" href="#ep-search">GET /manga/search</a>
+      <a class="sidebar-link" href="#ep-detail">GET /manga/:mangaId</a>
+      <a class="sidebar-link" href="#ep-chapters">GET /manga/:mangaId/chapters</a>
+      <a class="sidebar-link" href="#ep-pages">GET /manga/chapter/:chapterId/pages</a>
+      <a class="sidebar-link" href="#ep-image">GET /manga/image</a>
+    </nav>
+
+    <div class="sidebar-section">Response Format</div>
+    <nav class="sidebar-nav">
+      <a class="sidebar-link" href="#section-format">Envelope Schema</a>
+      <a class="sidebar-link" href="#section-errors">Error Codes</a>
+    </nav>
+  </aside>
+
+  <!-- MOBILE TOPBAR -->
+  <header class="topbar" id="topbar">
+    <button class="topbar-toggle" id="sidebar-toggle" aria-label="Toggle menu">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar-title">&#x26E9; Shinigami API</span>
+    <span class="status-dot" id="status-dot" title="Checking..."></span>
+  </header>
+
+  <!-- OVERLAY -->
+  <div class="overlay hidden" id="overlay"></div>
+
+  <!-- MAIN CONTENT -->
+  <main class="main" id="main">
+
+    <!-- HERO -->
+    <section class="hero-section">
+      <div class="hero-badge">REST API</div>
+      <h1 class="hero-title">Shinigami API <span>Documentation</span></h1>
+      <p class="hero-sub">Manga data API powered by Shinigami scraper. All endpoints return JSON. No authentication required.</p>
+      <div class="hero-meta">
+        <div class="meta-item">
+          <span class="meta-label">Base URL</span>
+          <code class="meta-val" id="hero-base-url">http://localhost:3000/api</code>
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">Status</span>
+          <span class="api-status" id="api-status">Checking...</span>
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">Version</span>
+          <span class="meta-val">v1.0.0</span>
+        </div>
+      </div>
+      <div class="hero-actions">
+        <button class="btn-primary" id="btn-check-status">Check Status</button>
+        <button class="btn-secondary" onclick="document.getElementById('ep-popular').scrollIntoView({behavior:'smooth'})">View Endpoints</button>
+      </div>
+    </section>
+
+    <!-- FORMAT -->
+    <section class="doc-section" id="section-format">
+      <h2 class="section-title">Response Envelope</h2>
+      <p class="section-desc">Every endpoint wraps its payload in a consistent envelope.</p>
+      <div class="schema-grid">
+        <div class="schema-block">
+          <div class="schema-label">Success</div>
+          <pre class="code-block">{
+  "success": true,
+  "data": { ... }
+}</pre>
+        </div>
+        <div class="schema-block">
+          <div class="schema-label">Error</div>
+          <pre class="code-block">{
+  "success": false,
+  "error": "Error message"
+}</pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- ERRORS -->
+    <section class="doc-section" id="section-errors">
+      <h2 class="section-title">Error Codes</h2>
+      <table class="table">
+        <thead><tr><th>Status</th><th>Meaning</th></tr></thead>
+        <tbody>
+          <tr><td><span class="badge-status s200">200</span></td><td>Success</td></tr>
+          <tr><td><span class="badge-status s400">400</span></td><td>Bad request — missing or invalid parameter</td></tr>
+          <tr><td><span class="badge-status s500">500</span></td><td>Server error — upstream scraper failed</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- ENDPOINT: popular -->
+    <section class="doc-section endpoint-section" id="ep-popular">
+      <div class="ep-header">
+        <span class="method get">GET</span>
+        <span class="ep-path">/api/manga/popular</span>
+        <button class="copy-btn" data-copy="/api/manga/popular">Copy</button>
+      </div>
+      <p class="section-desc">Returns a paginated list of popular manga sorted by popularity.</p>
+
+      <h3 class="param-title">Query Parameters</h3>
+      <table class="table">
+        <thead><tr><th>Param</th><th>Type</th><th>Required</th><th>Default</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>page</code></td><td>integer</td><td>No</td><td>1</td><td>Page number</td></tr>
+        </tbody>
+      </table>
+
+      <h3 class="param-title">Response Schema</h3>
+      <pre class="code-block">{
+  "success": true,
+  "data": {
+    "mangas": [
+      {
+        "title": "string",
+        "thumbnail": "string (URL)",
+        "url": "string (mangaId)",
+        "mangaUrl": "string"
+      }
+    ],
+    "hasNextPage": "boolean"
+  }
+}</pre>
+
+      <div class="tryit-block" id="try-popular">
+        <div class="tryit-header">
+          <span class="tryit-label">Try it</span>
+          <div class="tryit-params">
+            <label>page <input class="tryit-input" type="number" value="1" min="1" id="try-popular-page" /></label>
+          </div>
+          <button class="tryit-btn" data-endpoint="popular">Send Request</button>
+        </div>
+        <div class="tryit-result hidden" id="try-popular-result"></div>
+      </div>
+    </section>
+
+    <!-- ENDPOINT: latest -->
+    <section class="doc-section endpoint-section" id="ep-latest">
+      <div class="ep-header">
+        <span class="method get">GET</span>
+        <span class="ep-path">/api/manga/latest</span>
+        <button class="copy-btn" data-copy="/api/manga/latest">Copy</button>
+      </div>
+      <p class="section-desc">Returns a paginated list of recently updated manga.</p>
+
+      <h3 class="param-title">Query Parameters</h3>
+      <table class="table">
+        <thead><tr><th>Param</th><th>Type</th><th>Required</th><th>Default</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>page</code></td><td>integer</td><td>No</td><td>1</td><td>Page number</td></tr>
+        </tbody>
+      </table>
+
+      <h3 class="param-title">Response Schema</h3>
+      <pre class="code-block">{
+  "success": true,
+  "data": {
+    "mangas": [ { "title": "string", "thumbnail": "string", "url": "string", "mangaUrl": "string" } ],
+    "hasNextPage": "boolean"
+  }
+}</pre>
+
+      <div class="tryit-block" id="try-latest">
+        <div class="tryit-header">
+          <span class="tryit-label">Try it</span>
+          <div class="tryit-params">
+            <label>page <input class="tryit-input" type="number" value="1" min="1" id="try-latest-page" /></label>
+          </div>
+          <button class="tryit-btn" data-endpoint="latest">Send Request</button>
+        </div>
+        <div class="tryit-result hidden" id="try-latest-result"></div>
+      </div>
+    </section>
+
+    <!-- ENDPOINT: search -->
+    <section class="doc-section endpoint-section" id="ep-search">
+      <div class="ep-header">
+        <span class="method get">GET</span>
+        <span class="ep-path">/api/manga/search</span>
+        <button class="copy-btn" data-copy="/api/manga/search">Copy</button>
+      </div>
+      <p class="section-desc">Search manga by title or genre keyword.</p>
+
+      <h3 class="param-title">Query Parameters</h3>
+      <table class="table">
+        <thead><tr><th>Param</th><th>Type</th><th>Required</th><th>Default</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>q</code></td><td>string</td><td><span class="required">Yes</span></td><td>—</td><td>Search query</td></tr>
+          <tr><td><code>page</code></td><td>integer</td><td>No</td><td>1</td><td>Page number</td></tr>
+        </tbody>
+      </table>
+
+      <h3 class="param-title">Response Schema</h3>
+      <pre class="code-block">{
+  "success": true,
+  "data": {
+    "mangas": [ { "title": "string", "thumbnail": "string", "url": "string", "mangaUrl": "string" } ],
+    "hasNextPage": "boolean"
+  }
+}</pre>
+
+      <div class="tryit-block" id="try-search">
+        <div class="tryit-header">
+          <span class="tryit-label">Try it</span>
+          <div class="tryit-params">
+            <label>q <input class="tryit-input" type="text" placeholder="e.g. naruto" id="try-search-q" /></label>
+            <label>page <input class="tryit-input" type="number" value="1" min="1" id="try-search-page" /></label>
+          </div>
+          <button class="tryit-btn" data-endpoint="search">Send Request</button>
+        </div>
+        <div class="tryit-result hidden" id="try-search-result"></div>
+      </div>
+    </section>
+
+    <!-- ENDPOINT: detail -->
+    <section class="doc-section endpoint-section" id="ep-detail">
+      <div class="ep-header">
+        <span class="method get">GET</span>
+        <span class="ep-path">/api/manga/:mangaId</span>
+        <button class="copy-btn" data-copy="/api/manga/:mangaId">Copy</button>
+      </div>
+      <p class="section-desc">Get detailed info for a single manga by its ID.</p>
+
+      <h3 class="param-title">Path Parameters</h3>
+      <table class="table">
+        <thead><tr><th>Param</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>mangaId</code></td><td>string</td><td><span class="required">Yes</span></td><td>Manga ID from list endpoints (<code>url</code> field)</td></tr>
+        </tbody>
+      </table>
+
+      <h3 class="param-title">Response Schema</h3>
+      <pre class="code-block">{
+  "success": true,
+  "data": {
+    "title": "string",
+    "author": "string",
+    "artist": "string",
+    "status": "Ongoing | Completed | Unknown",
+    "description": "string",
+    "genre": "string (comma-separated)",
+    "thumbnail": "string (URL)"
+  }
+}</pre>
+
+      <div class="tryit-block" id="try-detail">
+        <div class="tryit-header">
+          <span class="tryit-label">Try it</span>
+          <div class="tryit-params">
+            <label>mangaId <input class="tryit-input" type="text" placeholder="e.g. 123" id="try-detail-id" /></label>
+          </div>
+          <button class="tryit-btn" data-endpoint="detail">Send Request</button>
+        </div>
+        <div class="tryit-result hidden" id="try-detail-result"></div>
+      </div>
+    </section>
+
+    <!-- ENDPOINT: chapters -->
+    <section class="doc-section endpoint-section" id="ep-chapters">
+      <div class="ep-header">
+        <span class="method get">GET</span>
+        <span class="ep-path">/api/manga/:mangaId/chapters</span>
+        <button class="copy-btn" data-copy="/api/manga/:mangaId/chapters">Copy</button>
+      </div>
+      <p class="section-desc">Get the full chapter list for a manga.</p>
+
+      <h3 class="param-title">Path Parameters</h3>
+      <table class="table">
+        <thead><tr><th>Param</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>mangaId</code></td><td>string</td><td><span class="required">Yes</span></td><td>Manga ID</td></tr>
+        </tbody>
+      </table>
+
+      <h3 class="param-title">Response Schema</h3>
+      <pre class="code-block">{
+  "success": true,
+  "data": [
+    {
+      "name": "string (e.g. Chapter 1)",
+      "dateUpload": "number (Unix ms timestamp)",
+      "url": "string (chapterId)",
+      "chapterUrl": "string"
+    }
+  ]
+}</pre>
+
+      <div class="tryit-block" id="try-chapters">
+        <div class="tryit-header">
+          <span class="tryit-label">Try it</span>
+          <div class="tryit-params">
+            <label>mangaId <input class="tryit-input" type="text" placeholder="e.g. 123" id="try-chapters-id" /></label>
+          </div>
+          <button class="tryit-btn" data-endpoint="chapters">Send Request</button>
+        </div>
+        <div class="tryit-result hidden" id="try-chapters-result"></div>
+      </div>
+    </section>
+
+    <!-- ENDPOINT: pages -->
+    <section class="doc-section endpoint-section" id="ep-pages">
+      <div class="ep-header">
+        <span class="method get">GET</span>
+        <span class="ep-path">/api/manga/chapter/:chapterId/pages</span>
+        <button class="copy-btn" data-copy="/api/manga/chapter/:chapterId/pages">Copy</button>
+      </div>
+      <p class="section-desc">Get the page image list for a chapter. Images must be fetched via the <code>/api/manga/image</code> proxy endpoint.</p>
+
+      <h3 class="param-title">Path Parameters</h3>
+      <table class="table">
+        <thead><tr><th>Param</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>chapterId</code></td><td>string</td><td><span class="required">Yes</span></td><td>Chapter ID from chapters list (<code>url</code> field)</td></tr>
+        </tbody>
+      </table>
+
+      <h3 class="param-title">Response Schema</h3>
+      <pre class="code-block">{
+  "success": true,
+  "data": [
+    {
+      "index": "number",
+      "imageUrl": "string (proxied via /api/manga/image)"
+    }
+  ]
+}</pre>
+
+      <div class="tryit-block" id="try-pages">
+        <div class="tryit-header">
+          <span class="tryit-label">Try it</span>
+          <div class="tryit-params">
+            <label>chapterId <input class="tryit-input" type="text" placeholder="e.g. 456" id="try-pages-id" /></label>
+          </div>
+          <button class="tryit-btn" data-endpoint="pages">Send Request</button>
+        </div>
+        <div class="tryit-result hidden" id="try-pages-result"></div>
+      </div>
+    </section>
+
+    <!-- ENDPOINT: image -->
+    <section class="doc-section endpoint-section" id="ep-image">
+      <div class="ep-header">
+        <span class="method get">GET</span>
+        <span class="ep-path">/api/manga/image</span>
+        <button class="copy-btn" data-copy="/api/manga/image">Copy</button>
+      </div>
+      <p class="section-desc">Image proxy — fetches manga images with the correct referer headers. Use this to display images that would otherwise be blocked by hotlink protection.</p>
+
+      <h3 class="param-title">Query Parameters</h3>
+      <table class="table">
+        <thead><tr><th>Param</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>url</code></td><td>string (URL-encoded)</td><td><span class="required">Yes</span></td><td>Original image URL to proxy</td></tr>
+        </tbody>
+      </table>
+
+      <h3 class="param-title">Response</h3>
+      <pre class="code-block">Content-Type: image/jpeg
+Body: raw image binary</pre>
+
+      <div class="tryit-block" id="try-image">
+        <div class="tryit-header">
+          <span class="tryit-label">Try it</span>
+          <div class="tryit-params">
+            <label>url <input class="tryit-input" type="text" placeholder="https://..." id="try-image-url" style="width:280px" /></label>
+          </div>
+          <button class="tryit-btn" data-endpoint="image">Send Request</button>
+        </div>
+        <div class="tryit-result hidden" id="try-image-result"></div>
+      </div>
+    </section>
+
+    <footer class="doc-footer">
+      <span>Shinigami REST API &mdash; v1.0.0</span>
+      <span>Base URL: <code id="footer-base-url">http://localhost:3000/api</code></span>
+    </footer>
+
+  </main>
+
+  <script src="app.js" defer></script>
+</body>
+</html>
