@@ -15,7 +15,7 @@ export class ShinigamiService {
 
   constructor() {
     this.baseUrl = "https://app.shinigami.asia";
-    this.apiUrl = "https://api.shngm.io";
+    this.apiUrl = "https://api.shinigami.io";
     this.cdnUrl = "https://storage.shngm.id";
 
     this.client = axios.create({
