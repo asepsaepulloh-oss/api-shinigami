@@ -10,12 +10,14 @@ import {
 export class ShinigamiService {
   private baseUrl: string;
   private apiUrl: string;
+  private fallbackChapterApiUrl: string;
   private cdnUrl: string;
   private client: AxiosInstance;
 
   constructor() {
     this.baseUrl = "https://app.shinigami.asia";
     this.apiUrl = "https://api.shinigami.io";
+    this.fallbackChapterApiUrl = "https://api.shngm.io";
     this.cdnUrl = "https://storage.shngm.id";
 
     this.client = axios.create({
@@ -40,6 +42,15 @@ export class ShinigamiService {
       Origin: this.baseUrl,
       "Sec-GPC": "1",
       "X-Requested-With": this.randomString(Math.floor(Math.random() * 20) + 1),
+    };
+  }
+
+  // Never send Origin header to chapter list upstreams (api.shngm.io returns 502 with Origin)
+  private getChapterHeaders(): Record<string, string> {
+    return {
+      Accept: "application/json",
+      DNT: "1",
+      "Sec-GPC": "1",
     };
   }
 
@@ -227,66 +238,273 @@ export class ShinigamiService {
     }
   }
 
-  async getChapterList(mangaId: string): Promise<Chapter[]> {
-    try {
-      const response = await this.client.get(
-        `${this.apiUrl}/v1/chapter/${mangaId}/list`,
-        {
-          params: {
-            page_size: 3000,
-          },
-        }
-      );
+  private extractChapterItems(payload: any): any[] {
+    if (Array.isArray(payload)) {
+      return payload;
+    }
+    if (payload?.chapter_list && Array.isArray(payload.chapter_list)) {
+      return payload.chapter_list;
+    }
+    if (payload?.data && Array.isArray(payload.data)) {
+      return payload.data;
+    }
+    return [];
+  }
 
-      let chapterList: any[] = [];
+  private async requestChapterPage(
+    baseUrl: string,
+    mangaId: string,
+    params: Record<string, string | number>
+  ): Promise<any> {
+    const response = await axios.get(
+      `${baseUrl}/v1/chapter/${encodeURIComponent(mangaId)}/list`,
+      {
+        params,
+        headers: this.getChapterHeaders(),
+        timeout: 15000,
+      }
+    );
+    return response.data;
+  }
 
-      if (Array.isArray(response.data)) {
-        chapterList = response.data;
-      } else if (
-        response.data?.chapter_list &&
-        Array.isArray(response.data.chapter_list)
-      ) {
-        chapterList = response.data.chapter_list;
-      } else if (response.data?.data && Array.isArray(response.data.data)) {
-        chapterList = response.data.data;
+  private async fetchAllChaptersCursorOrPaged(
+    baseUrl: string,
+    mangaId: string,
+    candidatePageSizes: number[],
+    useLimitParam: boolean
+  ): Promise<any[]> {
+    let firstPayload: any = null;
+    let activePageSize = candidatePageSizes[candidatePageSizes.length - 1];
+    let lastError: any = null;
+
+    for (const size of candidatePageSizes) {
+      try {
+        const params: Record<string, string | number> = useLimitParam
+          ? {
+              limit: size,
+              sort_by: "chapter_number",
+              sort_order: "desc",
+            }
+          : {
+              page: 1,
+              page_size: size,
+              sort_by: "chapter_number",
+              sort_order: "desc",
+            };
+
+        firstPayload = await this.requestChapterPage(baseUrl, mangaId, params);
+        activePageSize = size;
+        break;
+      } catch (err: any) {
+        lastError = err;
+      }
+    }
+
+    if (!firstPayload) {
+      throw lastError || new Error("Failed to fetch initial chapter page");
+    }
+
+    const allRawChapters: any[] = [...this.extractChapterItems(firstPayload)];
+    const meta = firstPayload?.meta || {};
+
+    // Case 1: Page-based pagination (meta.total_page > 1)
+    const totalPage = Number(meta.total_page || 0);
+    if (totalPage > 1) {
+      const BATCH_CONCURRENCY = 6;
+      const pagesToFetch: number[] = [];
+      for (let p = 2; p <= totalPage; p++) {
+        pagesToFetch.push(p);
       }
 
-      if (!chapterList || chapterList.length === 0) {
+      for (let i = 0; i < pagesToFetch.length; i += BATCH_CONCURRENCY) {
+        const batch = pagesToFetch.slice(i, i + BATCH_CONCURRENCY);
+        const results = await Promise.allSettled(
+          batch.map((pageNum) =>
+            this.requestChapterPage(baseUrl, mangaId, {
+              page: pageNum,
+              page_size: activePageSize,
+              sort_by: "chapter_number",
+              sort_order: "desc",
+            })
+          )
+        );
+
+        for (let idx = 0; idx < results.length; idx++) {
+          const result = results[idx];
+          if (result.status === "fulfilled") {
+            allRawChapters.push(...this.extractChapterItems(result.value));
+          } else {
+            console.warn(
+              `[ShinigamiService] Failed fetching chapter page ${batch[idx]} for manga ${mangaId}:`,
+              result.reason?.response?.status || result.reason?.message
+            );
+          }
+        }
+      }
+
+      return allRawChapters;
+    }
+
+    // Case 2: Cursor-based pagination (meta.has_next && meta.next_cursor)
+    let hasNext = Boolean(meta.has_next && meta.next_cursor);
+    let nextCursor: string | undefined = meta.next_cursor;
+    const seenCursors = new Set<string>();
+    const MAX_CURSOR_REQUESTS = 100;
+    let cursorRequests = 0;
+
+    while (hasNext && nextCursor && cursorRequests < MAX_CURSOR_REQUESTS) {
+      if (seenCursors.has(nextCursor)) {
+        break;
+      }
+      seenCursors.add(nextCursor);
+      cursorRequests++;
+
+      try {
+        const pagePayload = await this.requestChapterPage(baseUrl, mangaId, {
+          limit: activePageSize,
+          cursor: nextCursor,
+          sort_by: "chapter_number",
+          sort_order: "desc",
+        });
+
+        const items = this.extractChapterItems(pagePayload);
+        if (items.length === 0) {
+          break;
+        }
+        allRawChapters.push(...items);
+
+        const nextMeta = pagePayload?.meta || {};
+        hasNext = Boolean(nextMeta.has_next && nextMeta.next_cursor);
+        nextCursor = nextMeta.next_cursor;
+      } catch (err: any) {
+        console.warn(
+          `[ShinigamiService] Failed fetching cursor batch #${cursorRequests} for manga ${mangaId}:`,
+          err?.response?.status || err?.message
+        );
+        // Return chapters collected so far instead of crashing the entire request
+        break;
+      }
+    }
+
+    return allRawChapters;
+  }
+
+  private normalizeAndSortChapters(
+    rawChapters: any[],
+    mangaId: string
+  ): Chapter[] {
+    interface MappedChapter {
+      chapter: Chapter;
+      chapterNumber: number;
+      originalIndex: number;
+    }
+
+    const seenIds = new Set<string>();
+    const mapped: MappedChapter[] = [];
+
+    for (let index = 0; index < rawChapters.length; index++) {
+      const item = rawChapters[index];
+      if (!item) continue;
+
+      const chapterId = String(item.chapter_id || item.id || "").trim();
+      if (!chapterId) continue;
+
+      // Deduplicate by chapter_id (url)
+      if (seenIds.has(chapterId)) {
+        continue;
+      }
+      seenIds.add(chapterId);
+
+      // Parse release_date into Unix timestamp in milliseconds
+      let dateUpload = 0;
+      const dateStr = item.release_date || item.date || item.created_at;
+      if (typeof dateStr === "number" && Number.isFinite(dateStr)) {
+        dateUpload = dateStr;
+      } else if (dateStr) {
+        const parsedDate = Date.parse(String(dateStr));
+        dateUpload = Number.isNaN(parsedDate) ? 0 : parsedDate;
+      }
+
+      const rawNum = item.chapter_number ?? item.name ?? item.number ?? "";
+      const chapterNumStr = String(rawNum).trim().replace(/\.0+$/, "");
+      const parsedNum = Number(rawNum);
+      const numericOrder = Number.isFinite(parsedNum)
+        ? parsedNum
+        : Number.NEGATIVE_INFINITY;
+
+      const chapterTitle = String(
+        item.chapter_title || item.title || ""
+      ).trim();
+
+      let name: string;
+      if (chapterNumStr && chapterTitle) {
+        name = `Chapter ${chapterNumStr} - ${chapterTitle}`;
+      } else if (chapterNumStr) {
+        name = `Chapter ${chapterNumStr}`;
+      } else if (chapterTitle) {
+        name = chapterTitle;
+      } else {
+        name = "Chapter";
+      }
+
+      mapped.push({
+        chapter: {
+          name: name.trim(),
+          dateUpload,
+          url: chapterId,
+          chapterUrl: `${this.baseUrl}/series/${mangaId}/${chapterId}`,
+        },
+        chapterNumber: numericOrder,
+        originalIndex: index,
+      });
+    }
+
+    // Sort descending by chapter_number (newest -> oldest)
+    mapped.sort((a, b) => {
+      if (b.chapterNumber !== a.chapterNumber) {
+        return b.chapterNumber - a.chapterNumber;
+      }
+      if (b.chapter.dateUpload !== a.chapter.dateUpload) {
+        return b.chapter.dateUpload - a.chapter.dateUpload;
+      }
+      return a.originalIndex - b.originalIndex;
+    });
+
+    return mapped.map((entry) => entry.chapter);
+  }
+
+  async getChapterList(mangaId: string): Promise<Chapter[]> {
+    try {
+      let rawChapters: any[] = [];
+
+      try {
+        // Primary: api.shinigami.io (supports high safe limit + cursor pagination without 502)
+        rawChapters = await this.fetchAllChaptersCursorOrPaged(
+          this.apiUrl,
+          mangaId,
+          [500, 100, 24],
+          true
+        );
+      } catch (primaryError: any) {
+        console.warn(
+          `[ShinigamiService] Primary chapter upstream failed for ${mangaId}, falling back to ${this.fallbackChapterApiUrl}:`,
+          primaryError?.response?.status || primaryError?.message
+        );
+
+        // Fallback: api.shngm.io (page-based pagination: try page_size=100, fallback to 24, parallel batches of 6)
+        rawChapters = await this.fetchAllChaptersCursorOrPaged(
+          this.fallbackChapterApiUrl,
+          mangaId,
+          [100, 24],
+          false
+        );
+      }
+
+      if (!rawChapters || rawChapters.length === 0) {
         return [];
       }
 
-      const chapters: Chapter[] = chapterList.map((item: any) => {
-        let dateUpload = 0;
-
-        const dateStr = item.release_date || item.date || item.created_at;
-        if (dateStr) {
-          try {
-            dateUpload = new Date(dateStr).getTime();
-          } catch (e) {
-            // Ignore parse errors
-          }
-        }
-
-        const chapterNum = String(
-          item.chapter_number || item.name || item.number || ""
-        ).replace(".0", "");
-
-        const chapterTitle = item.chapter_title || item.title || "";
-        const name = chapterTitle
-          ? `Chapter ${chapterNum} - ${chapterTitle}`
-          : `Chapter ${chapterNum}`;
-
-        return {
-          name: name.trim(),
-          dateUpload,
-          url: item.chapter_id || item.id || "",
-          chapterUrl: `${this.baseUrl}/series/${mangaId}/${
-            item.chapter_id || item.id
-          }`,
-        };
-      });
-
-      return chapters;
+      return this.normalizeAndSortChapters(rawChapters, mangaId);
     } catch (error: any) {
       if (error.response) {
         throw new Error(

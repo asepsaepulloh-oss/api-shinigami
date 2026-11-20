@@ -1,4 +1,4 @@
-﻿/* ===== ACCESS GATE ===== */
+/* ===== ACCESS GATE ===== */
 (function() {
   var ACCESS_CODE = 'KOMIKONLINE26';       // <-- change this to your code
   var STORAGE_KEY = 'shngm_access';
@@ -224,7 +224,12 @@ document.querySelectorAll('.tryit-btn').forEach(function(btn) {
       } else if (ep === 'chapters') {
         var id = document.getElementById('try-chapters-id').value.trim();
         if (!id) { showResult('try-chapters-result', 400, 0, '{ "error": "mangaId is required" }', false); return; }
-        url = API_BASE + '/manga/' + encodeURIComponent(id) + '/chapters';
+        var chPage  = (document.getElementById('try-chapters-page')?.value || '').trim();
+        var chLimit = (document.getElementById('try-chapters-limit')?.value || '').trim();
+        var qs = [];
+        if (chPage)  qs.push('page=' + encodeURIComponent(chPage));
+        if (chLimit) qs.push('limit=' + encodeURIComponent(chLimit));
+        url = API_BASE + '/manga/' + encodeURIComponent(id) + '/chapters' + (qs.length ? '?' + qs.join('&') : '');
         resultId = 'try-chapters-result';
 
       } else if (ep === 'pages') {

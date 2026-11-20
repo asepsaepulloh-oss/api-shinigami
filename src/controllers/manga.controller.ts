@@ -123,11 +123,68 @@ export class MangaController {
         return;
       }
 
-      const result = await this.shinigamiService.getChapterList(mangaId);
+      const rawPage =
+        typeof req.query.page === "string" ? req.query.page.trim() : "";
+      const rawLimit =
+        typeof req.query.limit === "string" ? req.query.limit.trim() : "";
+
+      const hasPagination = rawPage.length > 0 || rawLimit.length > 0;
+      let page = 1;
+      let limit: number | null = null;
+
+      if (hasPagination) {
+        if (rawPage.length > 0) {
+          if (!/^\d+$/.test(rawPage) || parseInt(rawPage, 10) < 1) {
+            const response: ApiResponse<null> = {
+              success: false,
+              error: 'Query parameter "page" must be a positive integer',
+            };
+            res.status(400).json(response);
+            return;
+          }
+          page = parseInt(rawPage, 10);
+        }
+
+        if (rawLimit.length > 0) {
+          if (!/^\d+$/.test(rawLimit) || parseInt(rawLimit, 10) < 1) {
+            const response: ApiResponse<null> = {
+              success: false,
+              error: 'Query parameter "limit" must be a positive integer',
+            };
+            res.status(400).json(response);
+            return;
+          }
+          limit = parseInt(rawLimit, 10);
+        } else {
+          limit = 50;
+        }
+      }
+
+      const allChapters = await this.shinigamiService.getChapterList(mangaId);
+      const total = allChapters.length;
+
+      let result = allChapters;
+      let totalPage = total > 0 ? 1 : 0;
+
+      if (hasPagination && limit !== null) {
+        totalPage = total > 0 ? Math.ceil(total / limit) : 0;
+        const startIndex = (page - 1) * limit;
+        result = allChapters.slice(startIndex, startIndex + limit);
+      }
+
+      res.setHeader(
+        "Cache-Control",
+        "s-maxage=300, stale-while-revalidate=600"
+      );
 
       const response: ApiResponse<typeof result> = {
         success: true,
         data: result,
+        meta: {
+          total,
+          page,
+          totalPage,
+        },
       };
 
       res.status(200).json(response);

@@ -55,8 +55,10 @@ router.get("/:mangaId", mangaController.getMangaDetails);
 
 /**
  * @route   GET /api/manga/:mangaId/chapters
- * @desc    Get chapter list for a manga
+ * @desc    Get full chapter list for a manga (or paginated slice when page/limit provided)
  * @param   mangaId - Manga ID
+ * @query   page - Optional page number (default: returns all chapters when omitted)
+ * @query   limit - Optional chapters per page (default: 50 when page is provided)
  * @access  Public
  */
 router.get("/:mangaId/chapters", mangaController.getChapterList);

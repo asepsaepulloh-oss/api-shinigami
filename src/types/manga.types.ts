@@ -32,9 +32,16 @@ export interface Page {
   imageUrl: string;
 }
 
+export interface PaginationMeta {
+  total: number;
+  page: number;
+  totalPage: number;
+}
+
 export interface ApiResponse<T> {
   success: boolean;
   data?: T;
+  meta?: PaginationMeta;
   message?: string;
   error?: string;
 }

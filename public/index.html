@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -307,7 +307,7 @@
         <span class="ep-path">/api/manga/:mangaId/chapters</span>
         <button class="copy-btn" data-copy="/api/manga/:mangaId/chapters">Copy</button>
       </div>
-      <p class="section-desc">Get the full chapter list for a manga.</p>
+      <p class="section-desc">Get the complete chapter list for a manga sorted from newest to oldest. Returns all chapters by default, or a paginated slice when optional <code>page</code> / <code>limit</code> query parameters are provided.</p>
 
       <h3 class="param-title">Path Parameters</h3>
       <table class="table">
@@ -317,24 +317,40 @@
         </tbody>
       </table>
 
+      <h3 class="param-title">Query Parameters</h3>
+      <table class="table">
+        <thead><tr><th>Param</th><th>Type</th><th>Required</th><th>Default</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>page</code></td><td>integer</td><td>No</td><td>—</td><td>Optional page number (1-indexed). Omit both <code>page</code> and <code>limit</code> to fetch all chapters.</td></tr>
+          <tr><td><code>limit</code></td><td>integer</td><td>No</td><td>50 (if <code>page</code> set)</td><td>Optional number of chapters per page</td></tr>
+        </tbody>
+      </table>
+
       <h3 class="param-title">Response Schema</h3>
       <pre class="code-block">{
   "success": true,
   "data": [
     {
-      "name": "string (e.g. Chapter 1)",
+      "name": "string (e.g. Chapter 937)",
       "dateUpload": "number (Unix ms timestamp)",
       "url": "string (chapterId)",
       "chapterUrl": "string"
     }
-  ]
+  ],
+  "meta": {
+    "total": "number",
+    "page": "number",
+    "totalPage": "number"
+  }
 }</pre>
 
       <div class="tryit-block" id="try-chapters">
         <div class="tryit-header">
           <span class="tryit-label">Try it</span>
           <div class="tryit-params">
-            <label>mangaId <input class="tryit-input" type="text" placeholder="e.g. 123" id="try-chapters-id" /></label>
+            <label>mangaId <input class="tryit-input" type="text" placeholder="e.g. c0f1d049-..." id="try-chapters-id" /></label>
+            <label>page <input class="tryit-input" type="number" min="1" placeholder="all" id="try-chapters-page" /></label>
+            <label>limit <input class="tryit-input" type="number" min="1" placeholder="all" id="try-chapters-limit" /></label>
           </div>
           <button class="tryit-btn" data-endpoint="chapters">Send Request</button>
         </div>
